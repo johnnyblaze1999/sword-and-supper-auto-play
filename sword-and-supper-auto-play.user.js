@@ -44,6 +44,33 @@
 
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+  // --- Wake Lock (Keep Tab Active) ---
+  let wakeLockAudio = null;
+  const startWakeLock = () => {
+    if (wakeLockAudio) return;
+
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioContext();
+      const buffer = audioCtx.createBuffer(1, 1, 22050);
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+      source.loop = true;
+      source.start(0);
+      wakeLockAudio = { source, audioCtx };
+      log("Wake lock started to keep tab active.");
+    } catch (e) {
+      console.error("[Sword&Supper] Could not start wake lock audio.", e);
+    }
+  };
+
+  const stopWakeLock = () => {
+    if (!wakeLockAudio) return;
+    wakeLockAudio.source.stop();
+    wakeLockAudio.audioCtx.close().then(() => log("Wake lock stopped."));
+  };
+
   const clickWithDelay = async (el) => {
     if (!el) return false;
     await delay(CONFIG.clickInterval);
@@ -90,7 +117,7 @@
 
     const clickSkip = async (skipButtons) => {
       for (const btn of skipButtons) {
-        const text = b.textContent.trim().toLowerCase();
+        const text = btn.textContent.trim().toLowerCase();
         if (text.includes("skip") && btn.offsetParent !== null && !btn.disabled) {
             const btnText = btn.textContent.trim();
             await clickWithDelay(btn);
@@ -781,6 +808,7 @@
       if (document.querySelector(".advance-button")) {
         obs.disconnect();
         createPanel();
+        startWakeLock(); // Keep tab active once UI is ready
       }
     });
     obs.observe(document.body, { childList: true, subtree: true });
